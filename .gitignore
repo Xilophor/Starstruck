@@ -1,0 +1,15 @@
+# Ignore all
+/*
+
+# Add Files
+!README.md
+!Starstruck
+!Starstruck.sln
+!.gitignore
+!LICENSE
+!assets
+
+# Ignore files
+Starstruck/bin
+Starstruck/obj
+**.user
