@@ -10,8 +10,12 @@
 !.github
 !LICENSE
 !assets
+!NuGet.Config
 
 # Ignore files
 Starstruck/bin
 Starstruck/obj
-*.user
+**.user
+
+# Add Files
+!*.template.*.user
