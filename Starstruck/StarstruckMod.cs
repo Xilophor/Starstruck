@@ -11,7 +11,7 @@ namespace Starstruck
         
         internal static new ManualLogSource Logger;
 
-        private Harmony _harmony;
+        private static Harmony _harmony;
         
         private void Awake()
         {
@@ -23,16 +23,16 @@ namespace Starstruck
             Logger.LogInfo($"{MyPluginInfo.PLUGIN_NAME} v{MyPluginInfo.PLUGIN_VERSION} is loaded!");
         }
 
-        private void Patch()
+        private static void Patch()
         {
             _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
 
-
+            _harmony.PatchAll();
         }
 
-        private void Unpatch()
+        private static void Unpatch()
         {
-            
+            _harmony.UnpatchSelf();
         }
     }
 }

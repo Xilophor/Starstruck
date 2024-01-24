@@ -3,13 +3,15 @@
 
 # Add Files
 !README.md
+!CHANGELOG.md
 !Starstruck
 !Starstruck.sln
 !.gitignore
+!.github
 !LICENSE
 !assets
 
 # Ignore files
 Starstruck/bin
 Starstruck/obj
-**.user
+*.user
