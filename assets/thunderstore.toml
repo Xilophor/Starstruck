@@ -29,6 +29,10 @@ target = "/"
 source = "../Starstruck/bin/Release/netstandard2.1/Starstruck.dll"
 target = "/BepInEx/plugins/Starstruck/"
 
+[[build.copy]]
+source = "starstruckweatherassets"
+target = "/BepInEx/plugins/Starstruck/"
+
 [publish]
 communities = [ "lethal-company", ]
 [publish.categories]

@@ -11,6 +11,7 @@
 !LICENSE
 !assets
 !NuGet.Config
+!libs
 
 # Ignore files
 Starstruck/bin

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
-        <AssemblyName>xilophor.lc.starstuck</AssemblyName>
+        <AssemblyName>xilophor.lc.starstruck</AssemblyName>
         <Product>Starstruck</Product>
         <Description>Meteor showers!</Description>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -22,8 +22,16 @@
         <PackageReference Include="BepInEx.Core" Version="5.*" PrivateAssets="all"/>
         <PackageReference Include="BepInEx.PluginInfoProps" Version="2.1.0" PrivateAssets="all"/>
         <PackageReference Include="UnityEngine.Modules" Version="2022.3.9" IncludeAssets="compile" PrivateAssets="all"/>
+        <PackageReference Include="Evaisa.LethalLib" Version="0.13.2" PrivateAssets="all"/>
         <PackageReference Include="Evaisa.NetcodePatcher.MSBuild" Version="3.*" PrivateAssets="all"/>
+        <PackageReference Include="Xilophor.LethalNetworkAPI" Version="2.1.1" PrivateAssets="all"/>
         <PackageReference Include="MinVer" Version="4.*" PrivateAssets="all" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Reference Include="UniTask" PrivateAssets="all">
+            <HintPath>../libs/UniTask/UniTask.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
