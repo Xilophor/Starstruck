@@ -54,6 +54,10 @@
     <ItemGroup>
         <NetcodePatch Include="$(TargetPath)" />
     </ItemGroup>
+    
+    <Target Name="CopyFilesToUnity" AfterTargets="NetcodePatch;PostBuildEvent">
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="../Starstruck.UnityProject/Assets/Plugins/" />
+    </Target>
 
     <Target Name="SetPluginVersion" BeforeTargets="AddGeneratedFile" DependsOnTargets="MinVer">
         <PropertyGroup>

@@ -1,4 +1,4 @@
-# Ignore all
+# Ignore All
 /*
 
 # Add Files
@@ -12,8 +12,9 @@
 !assets
 !NuGet.Config
 !libs
+!Starstruck.UnityProject
 
-# Ignore files
+# Ignore Files
 Starstruck/bin
 Starstruck/obj
 **.user

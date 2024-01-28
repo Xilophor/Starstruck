@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Linq;
 using Cysharp.Threading.Tasks;
@@ -19,16 +19,12 @@ public class StarstruckWeather : MonoBehaviour
     [SerializeField] private int minTimeBetweenSpawns = 20;
     [SerializeField] private int maxTimeBetweenSpawns = 60;
     
-    // Range between distance offsets
-    [SerializeField] private int minOffset = 1;
-    [SerializeField] private int maxOffset = 25;
-    
     // Spawn Parameters
     [SerializeField] private int maxToSpawn = 1;
     [SerializeField] private int meteorLandRadius = 6;
     
-    private Vector2 MeteorSpawnDirection = Vector2.one;
-    private Vector3 MeteorSpawnLocationOffset = new(300,500,300);
+    private Vector2 _meteorSpawnDirection;
+    private Vector3 _meteorSpawnLocationOffset;
 
     private LethalServerMessage<MeteorSpawnInfo> _serverMessage;
     private LethalClientMessage<MeteorSpawnInfo> _clientMessage;
@@ -37,35 +33,65 @@ public class StarstruckWeather : MonoBehaviour
     private float _currentTimeOffset;
     private Random _random;
     private GameObject _meteorPrefab;
-    private static readonly int Tod = Animator.StringToHash("timeOfDay");
 
     private const int RandomSeedOffset = -53;
     
     private void OnEnable()
     {
-        _random = new Random(StartOfRound.Instance.randomMapSeed + RandomSeedOffset);
-        TimeOfDay.Instance.onTimeSync.AddListener(OnGlobalTimeSync);
-
         _serverMessage ??= new LethalServerMessage<MeteorSpawnInfo>("meteorSpawnSyncedEvent");
         _clientMessage ??= new LethalClientMessage<MeteorSpawnInfo>("meteorSpawnSyncedEvent", SpawnMeteor);
 
         _meteorPrefab ??= StarstruckMod.Assets["Meteor"] as GameObject;
-
-        var spawnDirection = (float)_random.NextDouble()*2*Mathf.PI;
-        
-        MeteorSpawnDirection = new Vector2(Mathf.Sin(spawnDirection), Mathf.Cos(spawnDirection));
-
-        MeteorSpawnLocationOffset = new Vector3(MeteorSpawnDirection.x*_random.Next(540,1200), 350, MeteorSpawnDirection.y*_random.Next(540,1200));
 
         if (!PlayerLoopHelper.IsInjectedUniTaskPlayerLoop())
         {
             var loop = PlayerLoop.GetCurrentPlayerLoop();
             PlayerLoopHelper.Initialize(ref loop);
         }
-
+        
 #if DEBUG
         StarstruckMod.Logger.LogDebug("Starstruck Weather Effect has been enabled!");
 #endif
+
+        if (!(NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsHost)) return;
+        
+        _random = new Random(StartOfRound.Instance.randomMapSeed + RandomSeedOffset);
+        TimeOfDay.Instance.onTimeSync.AddListener(OnGlobalTimeSync);
+
+        DecideSpawnArea().Forget();
+
+        // Wait 12-18 seconds before spawning first batch.
+        _currentTimeOffset = _random.Next(12, 18);
+        
+#if DEBUG
+        StarstruckMod.Logger.LogDebug("Server Starstruck Weather Effect params have been set!");
+#endif
+    }
+
+    private async UniTaskVoid DecideSpawnArea()
+    {
+        try
+        {
+            await UniTask.SwitchToThreadPool();
+
+            var spawnDirection = (float)_random.NextDouble() * 2 * Mathf.PI;
+
+            _meteorSpawnDirection = new Vector2(Mathf.Sin(spawnDirection), Mathf.Cos(spawnDirection));
+            _meteorSpawnLocationOffset = new Vector3(_meteorSpawnDirection.x * _random.Next(540, 1200), 350,
+                _meteorSpawnDirection.y * _random.Next(540, 1200));
+
+            if (!await PlanMeteor(maxAttempts: 6, spawn: false))
+            {
+                await UniTask.Yield();
+                await UniTask.NextFrame();
+
+                DecideSpawnArea().Forget();
+            }
+        }
+        finally
+        {
+            await UniTask.SwitchToMainThread();
+        }
     }
 
     private void SpawnMeteor(MeteorSpawnInfo meteorSpawnInfo)
@@ -75,14 +101,23 @@ public class StarstruckWeather : MonoBehaviour
 
     private async UniTaskVoid SpawnMeteorTask(MeteorSpawnInfo meteorSpawnInfo)
     {
-        await UniTask.Delay(TimeSpan.FromSeconds(meteorSpawnInfo.TimeToSpawnAt - NetworkManager.Singleton.LocalTime.Time));
-        
-        var meteorObject = Instantiate(_meteorPrefab, new Vector3(0, -1000, 0), Quaternion.identity);
-        meteorObject.GetComponent<Meteor>().SetParams(meteorSpawnInfo.SpawnLocation, meteorSpawnInfo.LandLocation);
-        
+        try
+        {
+            await UniTask.SwitchToThreadPool();
+            
+            await UniTask.Delay(TimeSpan.FromSeconds(meteorSpawnInfo.timeToSpawnAt - NetworkManager.Singleton.LocalTime.Time));
+            
+            var meteorObject = Instantiate(_meteorPrefab, new Vector3(0, -1000, 0), Quaternion.identity, StarstruckMod.effectObject.transform);
+            meteorObject.GetComponent<Meteor>().SetParams(meteorSpawnInfo.spawnLocation, meteorSpawnInfo.landLocation);
+            
 #if DEBUG
-        StarstruckMod.Logger.LogDebug($"Spawned meteor on client! {meteorSpawnInfo.SpawnLocation} -> {meteorSpawnInfo.LandLocation}");
+            StarstruckMod.Logger.LogDebug($"Spawned meteor on client! {meteorSpawnInfo.spawnLocation} -> {meteorSpawnInfo.landLocation}");
 #endif
+        }
+        finally
+        {
+            await UniTask.SwitchToMainThread();
+        }
     }
 
     private void OnDisable()
@@ -111,37 +146,58 @@ public class StarstruckWeather : MonoBehaviour
         
         for (var i = 0; i < amountToSpawn; i++)
         {
-            PlanMeteor();
+            PlanMeteor().Forget();
         }
     }
 
-    private void PlanMeteor()
+    private async UniTask<bool> PlanMeteor(int maxAttempts = 4, bool spawn = true)
     {
-        while (true)
+        try
         {
-            var initialPos = RoundManager.Instance.outsideAINodes[_random.Next(0, RoundManager.Instance.outsideAINodes.Length)].transform.position;
+            await UniTask.SwitchToThreadPool();
+            
+            for (var i = 0; i < maxAttempts; i++)
+            {
+                var initialPos = RoundManager.Instance.outsideAINodes[_random.Next(0, RoundManager.Instance.outsideAINodes.Length)].transform.position;
 
-            var landLocation = RoundManager.Instance.GetRandomNavMeshPositionInBoxPredictable(initialPos, radius: meteorLandRadius, navHit: RoundManager.Instance.navHit, randomSeed: _random);
-            var spawnLocation = landLocation+MeteorSpawnLocationOffset;
+                var landLocation = RoundManager.Instance.GetRandomNavMeshPositionInBoxPredictable(initialPos, radius: meteorLandRadius, navHit: RoundManager.Instance.navHit, randomSeed: _random);
+                var spawnLocation = landLocation+_meteorSpawnLocationOffset;
 
-            // See if theres anything in the way excluding foliage & trees, and try a new spawn if so.
-            // ReSharper disable once Unity.PreferNonAllocApi
-            var raycastHit = Physics.RaycastAll(spawnLocation, landLocation, Mathf.Infinity, ~layersToIgnore);
+                // See if theres anything in the way excluding foliage & trees, and try a new spawn if so.
+                // ReSharper disable once Unity.PreferNonAllocApi
+                var raycastHit = Physics.RaycastAll(spawnLocation, landLocation, Mathf.Infinity, ~layersToIgnore);
 #if DEBUG
-            StarstruckMod.Logger.LogDebug($"Casted ray. {raycastHit}, {raycastHit.Length}");
+                StarstruckMod.Logger.LogDebug($"Casted ray. {raycastHit}, {raycastHit.Length}");
 #endif
-            if (raycastHit.Any(hit => hit.transform && hit.transform.tag is not "Wood"))
-                continue;
-            
-            var timeAtSpawn = NetworkManager.Singleton.LocalTime.Time + (_random.NextDouble() * 10 + 2);
-            
+                if (raycastHit.Any(hit => hit.transform && hit.transform.tag is not "Wood"))
+                {
+                    await UniTask.Yield();
+                    await UniTask.NextFrame();
+                    
+                    continue;
+                }
+
+                // Skip spawn code if it's only running a check to make sure meteors can spawn.
+                if (!spawn) return true;
+                
+                var timeAtSpawn = NetworkManager.Singleton.LocalTime.Time + (_random.NextDouble() * 10 + 2);
+
 #if DEBUG
-            StarstruckMod.Logger.LogDebug($"Planning meteor strike from {spawnLocation} to {landLocation} in {timeAtSpawn-NetworkManager.Singleton.LocalTime.Time} seconds.");
+                StarstruckMod.Logger.LogDebug(
+                    $"Planning meteor strike from {spawnLocation} to {landLocation} in {timeAtSpawn - NetworkManager.Singleton.LocalTime.Time} seconds.");
 #endif
+
+                await UniTask.SwitchToMainThread();
+                _serverMessage.SendAllClients(new MeteorSpawnInfo(timeAtSpawn, spawnLocation, landLocation));
+
+                return true;
+            }
             
-            _serverMessage.SendAllClients(new MeteorSpawnInfo(timeAtSpawn, spawnLocation, landLocation));
-            
-            break;
+            return false;
+        }
+        finally
+        {
+            await UniTask.SwitchToMainThread();
         }
     }
 }
@@ -149,7 +205,7 @@ public class StarstruckWeather : MonoBehaviour
 [Serializable]
 public struct MeteorSpawnInfo(double timeToSpawnAt, Vector3 spawnLocation, Vector3 landLocation)
 {
-    public double TimeToSpawnAt = timeToSpawnAt;
-    public Vector3 SpawnLocation = spawnLocation;
-    public Vector3 LandLocation = landLocation;
+    public double timeToSpawnAt = timeToSpawnAt;
+    public Vector3 spawnLocation = spawnLocation;
+    public Vector3 landLocation = landLocation;
 }

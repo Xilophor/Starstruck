@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -9,7 +10,9 @@ namespace Starstruck.Weather;
 /// </summary>
 public class Meteor : MonoBehaviour
 {
-    [SerializeField] private float timeToLand = 4.7f;
+    [SerializeField] private int speed = 170;
+    
+    [SerializeField] private GameObject scrapToSpawn;
     
     private float _actualTimeToLand;
 
@@ -25,7 +28,7 @@ public class Meteor : MonoBehaviour
         _spawnLocation = spawnLocation;
         _landLocation = landLocation;
 
-        _actualTimeToLand = Vector3.Distance(_spawnLocation, _landLocation) / 185;
+        _actualTimeToLand = Vector3.Distance(_spawnLocation, _landLocation) / speed;
         
 #if DEBUG
         StarstruckMod.Logger.LogDebug($"Actual Time to Land: {_actualTimeToLand}");
@@ -44,9 +47,19 @@ public class Meteor : MonoBehaviour
         // Ensure the meteor has landed
         else if (Vector3.Distance(gameObject.transform.position, _landLocation) < 5)
         {
-            Landmine.SpawnExplosion(_landLocation, true, 1.8f, 3.6f);
+            Explode();
             
             Destroy(gameObject);
         }
+    }
+
+    // ReSharper disable Unity.PerformanceAnalysis
+    private void Explode()
+    {
+        Landmine.SpawnExplosion(_landLocation, true, 1.8f, 3.6f);
+
+        if (!(NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsHost) || scrapToSpawn == null) return;
+
+        Instantiate(scrapToSpawn, _landLocation, Quaternion.identity).GetComponent<NetworkObject>().Spawn();
     }
 }

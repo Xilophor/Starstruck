@@ -3,7 +3,6 @@ using System.IO;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
-using LethalLib;
 using LethalLib.Modules;
 using UnityEngine;
 
@@ -16,8 +15,10 @@ public class StarstruckMod : BaseUnityPlugin
 {
     public static StarstruckMod Instance;
         
-    internal static new ManualLogSource Logger;
-
+    internal new static ManualLogSource Logger;
+    internal static GameObject effectObject;
+    internal static GameObject effectPermanentObject;
+    
     private static Harmony _harmony;
         
     private void Awake()
@@ -28,14 +29,14 @@ public class StarstruckMod : BaseUnityPlugin
         LoadAssetBundle("starstruckweatherassets");
         Patch();
         
-        var effectObject = Instantiate(Assets["StarstruckMeteorContainer"] as GameObject, Vector3.zero, Quaternion.identity);
+        effectObject = Instantiate(Assets["StarstruckMeteorContainer"] as GameObject, Vector3.zero, Quaternion.identity);
         effectObject.hideFlags = HideFlags.HideAndDontSave;
         DontDestroyOnLoad(effectObject);
-        var effectPermanentObject = Instantiate(Assets["StarstruckWeather"] as GameObject, Vector3.zero, Quaternion.identity);
+        effectPermanentObject = Instantiate(Assets["StarstruckWeather"] as GameObject, Vector3.zero, Quaternion.identity);
         effectPermanentObject.hideFlags = HideFlags.HideAndDontSave;
         DontDestroyOnLoad(effectPermanentObject);
         
-        WeatherEffect starstruckWeather = new WeatherEffect()
+        var starstruckWeather = new WeatherEffect()
         {
             name = "Starstruck",
             effectObject = effectObject,

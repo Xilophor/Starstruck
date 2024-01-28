@@ -5,7 +5,7 @@
         <PluginsDirectory>...\Lethal Company\BepInEx\plugins\</PluginsDirectory>
     </PropertyGroup>
 
-    <Target Name="CopyFiles" AfterTargets="PostBuildEvent">
+    <Target Name="CopyFiles" AfterTargets="NetcodePatch;PostBuildEvent">
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDirectory)" />
     </Target>
 </Project>
